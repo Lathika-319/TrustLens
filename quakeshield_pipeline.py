@@ -586,7 +586,7 @@ def classify_priority(row):
 
         return (
             "PRIORITIZE - "
-            "INFRASTRUCTURE AT RISK"
+            "INFRASTRUCTURE NEARBY"
         )
 
 
