@@ -1,16 +1,29 @@
-# React + Vite
+# QuakeShield dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite + Leaflet front end for QuakeShield. It shows each earthquake scenario on a terrain map with hazard probabilities, the risk score, nearby OpenStreetMap infrastructure and the response priority.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Open http://localhost:5173.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Data
 
-## Expanding the Oxlint configuration
+The dashboard reads `src/scenarioData.js`, which is generated from `../outputs/quakeshield_final_output.csv`. After re-running the pipeline, regenerate it with:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+python make_data2.py ../outputs/quakeshield_final_output.csv
+```
+
+## Files
+
+- `src/App.jsx` - map, scenario details, infrastructure context panel
+- `src/App.css` - styling
+- `src/scenarioData.js` - generated scenario data
+- `make_data2.py` - converts the pipeline CSV into `scenarioData.js`
+
+Map tiles: OpenTopoMap (terrain), data (c) OpenStreetMap contributors, SRTM.
