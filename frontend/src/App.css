@@ -1,0 +1,386 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #071521;
+  color: white;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 25px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 36px;
+}
+
+.header p {
+  color: #8fa5b7;
+}
+
+.status {
+  background: #0d293d;
+  padding: 10px 16px;
+  border-radius: 20px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background: #39ce76;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: #0c2132;
+  border: 1px solid #1d3d54;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.stat-label {
+  color: #8ca1b2;
+  font-size: 12px;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.high-text {
+  color: #ff4655;
+}
+
+.medium-text {
+  color: #ffad3d;
+}
+
+.low-text {
+  color: #39ce76;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+}
+
+.map-card,
+.details-card,
+.pipeline-card {
+  background: #0c2132;
+  border: 1px solid #1d3d54;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-header,
+.details-header {
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.section-header h2,
+.details-header h2 {
+  margin: 0;
+}
+
+.section-header p,
+.details-header p {
+  color: #8197a9;
+  font-size: 13px;
+}
+
+.legend {
+  display: flex;
+  gap: 15px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.high-dot {
+  background: #ff4655;
+}
+
+.medium-dot {
+  background: #ffad3d;
+}
+
+.low-dot {
+  background: #39ce76;
+}
+
+.real-map {
+  height: 500px;
+  width: 100%;
+}
+
+.leaflet-container {
+  background: #0a2135;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #102a3d;
+  color: white;
+}
+
+.leaflet-popup-tip {
+  background: #102a3d;
+}
+
+.details-card {
+  padding: 20px;
+}
+
+.risk-badge {
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.risk-badge.high {
+  background: #461b22;
+  color: #ff6b78;
+}
+
+.risk-badge.medium {
+  background: #49351c;
+  color: #ffc36b;
+}
+
+.risk-badge.low {
+  background: #163b28;
+  color: #66e59a;
+}
+
+.location-name {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 10px 0 20px;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.detail-item,
+.probability-card {
+  background: #091b2a;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.detail-item span,
+.probability-card span {
+  display: block;
+  color: #8197a9;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.model-section {
+  margin-top: 22px;
+}
+
+.model-section h3,
+.explanation h3 {
+  font-size: 14px;
+}
+
+.probability-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.probability-card strong {
+  font-size: 20px;
+}
+
+.progress {
+  height: 5px;
+  background: #1c3547;
+  margin-top: 10px;
+  border-radius: 5px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #48a9ff;
+  border-radius: 5px;
+}
+
+.score-box {
+  margin-top: 15px;
+  padding: 16px;
+  background: #102b40;
+  border-radius: 8px;
+}
+
+.score-box span {
+  display: block;
+  color: #8da4b6;
+  font-size: 11px;
+}
+
+.score-box strong {
+  font-size: 28px;
+}
+
+.score-description {
+  color: #8096a8;
+  font-size: 11px;
+  margin-top: 5px;
+}
+
+.explanation {
+  margin-top: 18px;
+  padding: 15px;
+  background: #091b2a;
+  border-left: 3px solid #48a9ff;
+}
+
+.explanation p {
+  color: #a8bac8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pipeline-card {
+  margin-top: 20px;
+  padding: 20px;
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.pipeline-step {
+  flex: 1;
+  padding: 15px;
+  background: #091b2a;
+  border-radius: 8px;
+}
+
+.pipeline-step span {
+  color: #48a9ff;
+  font-size: 11px;
+}
+
+.pipeline-step strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.pipeline-step small {
+  color: #7890a3;
+}
+
+.arrow {
+  color: #52758c;
+  font-size: 20px;
+}
+
+footer {
+  text-align: center;
+  color: #60798d;
+  font-size: 11px;
+  padding: 25px;
+}
+
+@media (max-width: 900px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .stats {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+/* ===== redesign overrides ===== */
+html, body, #root { background:#f4f1ea !important; }
+body { margin:0; color:#1c1c1a !important; font-family:"Segoe UI", system-ui, sans-serif !important; }
+.app { background:#f4f1ea !important; color:#1c1c1a !important; max-width:1300px; margin:0 auto; padding:26px 32px !important; }
+.app * { box-shadow:none !important; text-shadow:none !important; backdrop-filter:none !important; }
+.app p, .app span, .app small { color:#5b5850 !important; }
+
+.header { display:flex; justify-content:space-between; align-items:flex-end; background:transparent !important; border:none !important; border-bottom:2px solid #1c1c1a !important; border-radius:0 !important; padding:0 0 14px 0 !important; margin-bottom:18px !important; }
+.header h1 { font-family:Georgia,"Times New Roman",serif !important; font-size:36px !important; letter-spacing:-0.5px; margin:0 !important; color:#1c1c1a !important; background:none !important; -webkit-text-fill-color:#1c1c1a !important; }
+.header p { margin:4px 0 0 !important; font-size:14px !important; }
+.status { display:none !important; }
+
+.stats { display:flex !important; gap:0 !important; background:#fbfaf6 !important; border:1px solid #cfc9bb !important; margin-bottom:18px !important; }
+.stat-card { flex:1; background:transparent !important; border:none !important; border-right:1px solid #cfc9bb !important; border-radius:0 !important; padding:14px 20px !important; }
+.stat-card:last-child { border-right:none !important; }
+.stat-label { font-size:11px !important; letter-spacing:1.2px; text-transform:uppercase; color:#6b675c !important; }
+.stat-value { font-family:Georgia,serif !important; font-size:34px !important; color:#1c1c1a !important; }
+.app .high-text { color:#b3261e !important; }
+.app .medium-text { color:#b26a00 !important; }
+.app .low-text { color:#2e7d4f !important; }
+
+.map-card, .details-card, .pipeline-card { background:#fbfaf6 !important; border:1px solid #cfc9bb !important; border-radius:2px !important; }
+.section-header h2, .details-header h2, .pipeline-card h2, .model-section h3, .explanation h3 { font-family:Georgia,serif !important; color:#1c1c1a !important; }
+.real-map { height:540px !important; border-radius:0 !important; border:1px solid #cfc9bb !important; }
+
+.location-name { font-family:Georgia,serif !important; font-size:26px !important; color:#1c1c1a !important; }
+.detail-item, .probability-card, .score-box, .explanation, .pipeline-step { background:#f4f1ea !important; border:1px solid #d9d3c4 !important; border-radius:2px !important; }
+.detail-item strong, .probability-card strong, .score-box strong, .pipeline-step strong { color:#1c1c1a !important; }
+.explanation p { color:#1c1c1a !important; line-height:1.55 !important; }
+.progress { background:#ddd7c8 !important; height:6px !important; border-radius:0 !important; }
+.progress-fill { background:#1c1c1a !important; border-radius:0 !important; }
+
+.risk-badge { background:transparent !important; border:1.5px solid currentColor !important; border-radius:2px !important; padding:4px 12px !important; font-weight:700 !important; letter-spacing:1px; }
+.app .risk-badge.high { color:#b3261e !important; }
+.app .risk-badge.medium { color:#b26a00 !important; }
+.app .risk-badge.low { color:#2e7d4f !important; }
+
+.pipeline-step span { color:#8a6d1f !important; }
+.arrow { color:#8a8574 !important; }
+footer { color:#8a8574 !important; }
+.map-card .leaflet-container, .map-card .real-map { height:560px !important; min-height:560px !important; }
+.map-card .leaflet-container, .map-card .real-map { height:560px !important; min-height:560px !important; }
+.map-card { align-self:start !important; }
+
+.leaflet-overlay-pane path.leaflet-interactive {
+  stroke: #ffffff !important;
+  stroke-width: 3px !important;
+  stroke-opacity: 1 !important;
+  fill-opacity: 1 !important;
+  filter: drop-shadow(0 0 1.5px #000) drop-shadow(0 0 1.5px #000);
+}

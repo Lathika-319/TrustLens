@@ -1,0 +1,10 @@
+earthquake_magnitude
+earthquake_depth_km
+distance_to_epicenter_km
+elevation_m
+depth_missing
+elevation_missing
+magnitude_distance_ratio
+magnitude_distance_interaction
+depth_distance_ratio
+log_elevation

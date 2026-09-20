@@ -1,0 +1,12 @@
+
+.venv/
+venv/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+cache/
+*.bak*
+.env
+*.zip
+frontend/make_frontend_data.py
