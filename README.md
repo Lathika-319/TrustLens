@@ -1,87 +1,222 @@
-# QuakeShield
+# QUAKESHIELD
 
-### Earthquake-triggered cascading hazard risk assessment
+## Hazard Intelligence for Earthquake-Triggered Secondary Hazards
 
-QuakeShield is a hackathon prototype for **scenario-level cascading-hazard risk assessment**. It combines predicted ground-failure probability, liquefaction probability, and nearby OpenStreetMap-mapped infrastructure to produce an interpretable risk score, risk level, and response-priority flag.
+QuakeShield is a prototype decision-support system for screening **co-seismic secondary hazards** associated with historical earthquake scenarios.
 
-The system is designed to answer:
+The current system combines:
 
-> **Given an earthquake scenario, what combination of cascading-hazard signals and nearby mapped infrastructure should be examined first?**
+* Earthquake scenario information
+* **P1 — Ground-failure model indicator**
+* **P2 — Liquefaction model indicator**
+* Verified historical and ShakeMap spatial evidence
+* Mapped infrastructure context
+* Human-review guidance
 
-> **Prototype note:** QuakeShield is a research/demo system. It does not predict actual earthquake damage or provide operational emergency instructions.
+The system is designed to help a reviewer understand **where secondary-hazard evidence exists and what supporting information is available**.
 
----
-
-## 📊 Interactive Dashboard
-
-![QuakeShield Dashboard](frontend/public/quakeshield-dashboard.png)
-
-The dashboard presents:
-
-* Earthquake magnitude and location
-* Ground-failure probability
-* Liquefaction probability
-* Combined scenario-level risk score
-* Risk level
-* Nearby mapped infrastructure
-* Approximate infrastructure distance
-* Prototype response-priority flag
-* Human-readable assessment explanation
+> **Important:** The current prototype is not a real-time earthquake warning system, does not predict future earthquakes, does not issue automatic public alerts, and does not produce a single combined probability of overall risk.
 
 ---
 
-## 🧭 How QuakeShield Works
+# 1. Problem
+
+A major earthquake can trigger multiple secondary hazards, including:
+
+* Ground failure
+* Liquefaction
+* Landslides
+* Lateral spreading
+* Other site-specific ground effects
+
+A single earthquake can therefore require examination from several hazard perspectives.
+
+Traditional workflows may require different datasets, models, spatial evidence sources, and infrastructure information to be reviewed separately.
+
+QuakeShield explores a modular architecture where individual hazard indicators and supporting evidence can be presented together for human review.
+
+---
+
+# 2. Current Objective
+
+The current prototype focuses on:
+
+1. Screening ground-failure behavior using earthquake-aware information.
+2. Screening liquefaction susceptibility using geotechnical information.
+3. Connecting selected historical earthquake scenarios with verified spatial evidence.
+4. Providing mapped infrastructure context.
+5. Keeping different hazard indicators separate rather than forcing them into an unsupported combined risk score.
+6. Supporting human interpretation rather than replacing expert or authority decisions.
+
+---
+
+# 3. Current System Scope
+
+The current implementation uses **historical earthquake scenarios**.
+
+It should therefore be understood as:
+
+> **Historical co-seismic secondary-hazard screening and evidence review.**
+
+It is **not** currently:
+
+* A real-time earthquake detection system
+* A future-earthquake prediction system
+* A calibrated probability-of-damage system
+* A public warning system
+* A verified damage assessment system
+* An exposure or vulnerability model
+* An automatic evacuation recommendation system
+
+These are potential future extensions.
+
+---
+
+# 4. System Architecture
 
 ```text
-Earthquake scenario
-        │
-        ▼
-P1 Model
-Ground-failure probability
-        │
-        ▼
-P2 Model
-Liquefaction probability
-        │
-        ▼
-Risk Fusion
-Combined scenario-level risk score
-        │
-        ▼
-Risk Level
-LOW / MEDIUM / HIGH
-        │
-        ▼
-Infrastructure Context
-OpenStreetMap features within 10 km
-        │
-        ▼
-Priority Rule + Explanation
+                    HISTORICAL EARTHQUAKE SCENARIO
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │  Scenario Information   │
+                    │ Magnitude / Location    │
+                    │ Date / Depth / PGA      │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+              ▼                  ▼                  ▼
+      ┌───────────────┐  ┌───────────────┐  ┌──────────────────┐
+      │ P1 Ground     │  │ P2 Liquefaction│  │ Spatial Evidence │
+      │ Failure       │  │               │  │                  │
+      │ Indicator     │  │ Indicator     │  │ Historical cases │
+      │               │  │               │  │ ShakeMap PGA     │
+      └───────┬───────┘  └───────┬───────┘  └────────┬─────────┘
+              │                  │                   │
+              └──────────────────┼───────────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ Infrastructure Context │
+                    │ Hospitals / Schools     │
+                    │ Bridges / Roads         │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ Human Review Support    │
+                    │ Evidence + Indicators   │
+                    │ Context + Explanation   │
+                    └─────────────────────────┘
 ```
 
-### 01 — Earthquake Scenario
+The architecture intentionally keeps the hazard indicators separate.
 
-Each scenario contains an earthquake location and magnitude.
+There is **no primary combined risk score** in the current production system.
 
-### 02 — P1: Ground-Failure Model
+---
 
-The P1 model estimates the probability of earthquake-triggered ground failure for the scenario location.
+# 5. Hazard Modules
 
-**Final P1 pipeline:**
+## P1 — Ground Failure
+
+### Status
+
+**ACTIVE**
+
+### Production model
 
 ```text
-SimpleImputer
-      ↓
+models/p1_ground_failure_model_slope_pga.joblib
+```
+
+### Production dataset
+
+```text
+data/QuakeShield_Final_Dataset_Slope_PGA.csv
+```
+
+### Features
+
+* `slope_degrees`
+* `PGA_g`
+
+The model uses:
+
+```text
+Median Imputation
+        ↓
 StandardScaler
-      ↓
+        ↓
 LogisticRegression
 ```
 
-### 03 — P2: Liquefaction Model
+### Dataset
 
-The P2 model estimates liquefaction probability across mapped sites and provides scenario-level liquefaction statistics.
+The production dataset contains:
 
-**Final P2 pipeline:**
+* 12,360 rows
+* 9 earthquake scenarios
+* 6,283 landslide-labelled observations
+* 6,077 background observations
+
+All rows have strong mapping confidence in the prepared dataset.
+
+### Validation
+
+Leave-One-Earthquake-Out (LOEO) evaluation produced:
+
+```text
+Mean ROC-AUC = 0.7177
+```
+
+A within-earthquake permutation diagnostic using 100 permutations produced:
+
+```text
+Observed LOEO AUC : 0.7177
+Permutation mean  : 0.5001
+Permutation SD    : 0.0107
+Maximum null AUC  : 0.5246
+Permutations >= observed : 0 / 100
+Empirical p-value : 0.0099
+```
+
+This diagnostic supports that the observed model performance was not reproduced by the tested within-earthquake permutation null.
+
+It does **not** prove causality, calibrated probability, or universal future generalization.
+
+### Interpretation
+
+The P1 output is a **model indicator/score**.
+
+It should not be interpreted as a calibrated probability of landslide occurrence.
+
+---
+
+# 6. P2 — Liquefaction
+
+### Status
+
+**ACTIVE**
+
+### Production model
+
+```text
+models/p2_liquefaction_model.joblib
+```
+
+### Training data
+
+```text
+data/raw/Database 7.xlsx
+```
+
+The `Liq database` worksheet contains the training data.
+
+### Model
+
+The production model uses:
 
 ```text
 SimpleImputer
@@ -89,273 +224,665 @@ SimpleImputer
 GradientBoostingClassifier
 ```
 
-### 04 — Risk Fusion
+### Features
 
-The P1 and P2 outputs are combined by the project risk-fusion layer to produce a scenario-level risk score and:
+The model uses geotechnical and earthquake-related variables including:
 
-* LOW
-* MEDIUM
-* HIGH
+* Effective stress ratio
+* `(N1)60`
+* `qt1N`
+* `Ic`
+* `VS1`
+* Fines content
+* Depth
+* Magnitude
+* PGA
 
-### 05 — Infrastructure Context
+Missingness indicators are also retained for selected geotechnical variables.
 
-The system checks for nearby OpenStreetMap-mapped infrastructure within a 10 km search radius, including:
+### Important limitation
+
+The P2 training workbook does not contain geographic coordinates.
+
+Therefore, the current P2 model is a **magnitude-conditioned geotechnical model indicator**, not a fully event-specific spatial liquefaction map.
+
+Scenario-level P2 values should therefore not be interpreted as calibrated event-level liquefaction probabilities.
+
+---
+
+# 7. Spatial Evidence
+
+### Status
+
+**ACTIVE CONTEXT MODULE**
+
+Spatial evidence provides additional historical and ground-motion context for selected earthquake scenarios.
+
+The current evidence layer combines:
+
+* Verified historical liquefaction records
+* Next Generation Liquefaction (NGL) mapped anchors
+* Historical PGA observations
+* USGS ShakeMap PGA at verified anchors
+
+### Current verified scenarios
+
+Spatial evidence is currently available for:
+
+* Tohoku-Oki
+* Kobe
+* Niigata-Chuetsu
+
+### Example evidence
+
+For Tohoku-Oki:
+
+```text
+Verified anchors: 5
+Historical records: 18
+Mean historical liquefaction rate: 82.9%
+Mean ShakeMap PGA: 0.371 g
+```
+
+For Kobe:
+
+```text
+Verified anchors: 3
+Historical records: 55
+Mean historical liquefaction rate: 66.7%
+Mean ShakeMap PGA: 0.708 g
+```
+
+For Niigata-Chuetsu:
+
+```text
+Verified anchors: 3
+Historical records: 3
+Mean historical liquefaction rate: 33.3%
+Mean ShakeMap PGA: 0.101 g
+```
+
+These values are presented as **historical and spatial evidence**, not as predictions or calibrated probabilities.
+
+### Important design decision
+
+A heuristic single spatial score was investigated and rejected.
+
+The final architecture preserves:
+
+* Historical evidence
+* ShakeMap evidence
+* Anchor count
+* Historical outcome information
+
+as separate evidence fields.
+
+---
+
+# 8. Infrastructure Context
+
+### Status
+
+**ACTIVE CONTEXT MODULE**
+
+Infrastructure information is retrieved as geographic context around a representative scenario location.
+
+Current categories include:
 
 * Hospitals
 * Schools
 * Bridges
-* Major roads
+* Roads
 
-The infrastructure layer is used as **context and proximity information**, not as a validated structural-exposure model.
+The infrastructure query uses a 10 km geographic search area.
 
-### 06 — Priority + Explanation
+### Important limitation
 
-A prototype decision rule combines the risk level with mapped infrastructure context to generate a response-priority flag and a human-readable explanation.
+The current infrastructure location is based on a **representative scenario dataset cell**, not necessarily a verified earthquake epicenter.
 
----
+Therefore the system should describe this information as:
 
-## 📈 Results
+> **Mapped infrastructure proximity context within 10 km of the representative scenario location.**
 
-The current pipeline produces **9 earthquake scenarios**.
+It should not be described as:
 
-| Scenario                   | Magnitude | Risk Score | Risk Level | Priority                           |
-| -------------------------- | --------: | ---------: | ---------- | ---------------------------------- |
-| Mesetas, Colombia          |       5.7 |      0.424 | MEDIUM     | PRIORITIZE - INFRASTRUCTURE NEARBY |
-| Belanting, Indonesia       |       6.9 |      0.382 | MEDIUM     | PRIORITIZE - INFRASTRUCTURE NEARBY |
-| Tohoku-Oki, Japan          |       9.1 |      0.380 | MEDIUM     | PRIORITIZE - INFRASTRUCTURE NEARBY |
-| Maria Antonia, Puerto Rico |       6.4 |      0.380 | MEDIUM     | MONITOR / FURTHER ASSESSMENT       |
-| Niigata-Chuetsu, Japan     |       6.6 |      0.297 | LOW        | LOWER PRIORITY                     |
-| Kashmir, Pakistan          |       7.6 |      0.285 | LOW        | LOWER PRIORITY                     |
-| Kobe, Japan                |       6.9 |      0.271 | LOW        | LOWER PRIORITY                     |
-| Palu, Indonesia            |       7.5 |      0.216 | LOW        | LOWER PRIORITY                     |
-| Tari, Papua New Guinea     |       7.5 |      0.210 | LOW        | LOWER PRIORITY                     |
+* Confirmed exposed infrastructure
+* Vulnerable infrastructure
+* Damaged infrastructure
+* Infrastructure at risk
+* Predicted infrastructure impact
 
-### Example: Belanting, Indonesia
-
-| Indicator                     |                              Value |
-| ----------------------------- | ---------------------------------: |
-| Magnitude                     |                                6.9 |
-| Ground-failure probability    |                              64.2% |
-| Mean liquefaction probability |                              59.6% |
-| Final risk score              |                              0.382 |
-| Risk level                    |                             MEDIUM |
-| Nearest mapped hospital       |                            3.15 km |
-| Nearest mapped school         |                            0.75 km |
-| Nearest mapped bridge         |                            0.98 km |
-| Nearest mapped road           |                            0.89 km |
-| Prototype priority            | PRIORITIZE - INFRASTRUCTURE NEARBY |
-
-These values demonstrate how the system combines hazard probabilities with infrastructure context for an interpretable scenario assessment.
+A zero count means that no mapped features were returned by the query; it does not prove that the category is absent.
 
 ---
 
-## 🗂️ Data & Outputs
+# 9. Why There Is No Combined Risk Score
 
-The pipeline generates scenario-level outputs including:
-
-* Ground-failure probability
-* Liquefaction probability statistics
-* Combined risk score
-* Risk level
-* Infrastructure presence
-* Nearest mapped infrastructure distances
-* Priority level
-* Human-readable explanation
-
-Main generated files:
+Earlier versions of the prototype multiplied the P1 and P2 outputs:
 
 ```text
-outputs/
-├── quakeshield_final_output.csv
-├── quakeshield_map_data.csv
-├── quakeshield_explanations.csv
-└── risk_fusion_inputs.csv
+P1 × P2
 ```
 
-The main final output is:
+and converted the result into:
+
+```text
+HIGH / MEDIUM / LOW
+```
+
+This approach was removed.
+
+The multiplication was a design heuristic rather than a validated probabilistic fusion method.
+
+The P1 and P2 models also represent different hazard mechanisms and are based on different datasets.
+
+Therefore the production system now reports:
+
+```text
+P1 Ground-Failure Indicator
+              +
+P2 Liquefaction Indicator
+              +
+Spatial Evidence
+              +
+Infrastructure Context
+```
+
+rather than:
+
+```text
+Single Combined Risk Score
+```
+
+This prevents the dashboard from presenting an unsupported number as an overall probability or risk level.
+
+---
+
+# 10. Human-in-the-Loop Design
+
+QuakeShield is designed as a **decision-support prototype**.
+
+The system provides:
+
+* Model indicators
+* Historical evidence
+* Spatial evidence
+* Infrastructure context
+* Supporting explanations
+
+A human reviewer remains responsible for interpreting the evidence.
+
+The current prototype does not automatically:
+
+* Issue warnings
+* Order evacuations
+* Declare an area unsafe
+* Confirm damage
+* Approve emergency actions
+
+---
+
+# 11. Modular Hazard Architecture
+
+The project uses a registry-based architecture.
+
+```text
+hazard_registry.py
+        │
+        ├── P1 Ground Failure
+        │       └── ACTIVE
+        │
+        ├── P2 Liquefaction
+        │       └── ACTIVE
+        │
+        ├── P3 Landslide
+        │       └── PLANNED
+        │
+        ├── P4 Lateral Spreading
+        │       └── PLANNED / EVALUATED
+        │
+        ├── E1 Spatial Evidence
+        │       └── ACTIVE
+        │
+        └── C1 Infrastructure Context
+                └── ACTIVE
+```
+
+The architecture allows additional hazard modules to be evaluated independently before being promoted to production.
+
+---
+
+# 12. P4 — Lateral Spreading Research Evaluation
+
+Lateral spreading was investigated using Next Generation Liquefaction field observations.
+
+### Research status
+
+**EVALUATED — NOT PROMOTED**
+
+A leakage-safe research dataset was constructed.
+
+Final dataset:
+
+```text
+299 clean field observations
+36 earthquake event groups
+37 positive observations
+262 negative observations
+```
+
+Feature coverage:
+
+```text
+PGA              100%
+PGV               99%
+Arias Intensity   99%
+```
+
+Outcome/displacement variables were not used as predictors.
+
+### Candidate predictors
+
+* PGA
+* PGV
+* Arias Intensity
+
+### Validation
+
+Leave-One-Earthquake-Out evaluation:
+
+```text
+ROC-AUC = 0.5362
+PR-AUC  = 0.1286
+```
+
+A 100-permutation within-earthquake diagnostic produced:
+
+```text
+Observed AUC       : 0.5362
+Permutation mean   : 0.5377
+Permutation SD     : 0.0676
+95th percentile    : 0.6311
+Permutations >= observed : 57 / 100
+Empirical p-value  : 0.5743
+```
+
+### Decision
+
+The observed P4 performance was not distinguishable from the tested permutation null.
+
+Therefore:
+
+* P4 is not promoted to production.
+* P4 is not connected to the active registry.
+* P4 is not connected to the production pipeline.
+* P4 is not displayed as an operational hazard indicator.
+
+The research dataset, candidate model, and validation results are retained for reproducibility and future investigation.
+
+This rejection means that the tested model was insufficient for production; it does not mean that lateral spreading is unimportant.
+
+---
+
+# 13. Production Pipeline
+
+Main pipeline:
+
+```text
+quakeshield_pipeline.py
+```
+
+The pipeline loads active hazard modules through the hazard registry.
+
+```text
+Historical Scenario
+        │
+        ├── P1 module
+        │     └── Ground-failure score
+        │
+        ├── P2 module
+        │     └── Liquefaction score
+        │
+        ├── E1 module
+        │     └── Spatial evidence
+        │
+        └── C1 module
+              └── Infrastructure context
+                    │
+                    ▼
+              Final scenario output
+```
+
+---
+
+# 14. Production Outputs
+
+The main production outputs include:
 
 ```text
 outputs/quakeshield_final_output.csv
+outputs/quakeshield_map_data.csv
+outputs/quakeshield_explanations.csv
+outputs/p2_review_context.csv
+outputs/p2_spatial_evidence_final.csv
 ```
 
----
+The final production output contains separate indicators and context fields.
 
-## 📁 Repository Structure
+Important production fields include:
 
 ```text
-TrustLens/
-│
-├── data/
-│   └── raw/                         # Source datasets
-│
-├── models/                          # Trained P1 and P2 models
-│
-├── outputs/                         # Generated pipeline outputs
-│   ├── quakeshield_final_output.csv
-│   ├── quakeshield_map_data.csv
-│   ├── quakeshield_explanations.csv
-│   └── risk_fusion_inputs.csv
-│
-├── scripts/
-│   ├── p1/                          # Ground-failure model
-│   ├── p2/                          # Liquefaction model
-│   └── risk/                        # Risk fusion + infrastructure layer
-│
-├── frontend/
-│   ├── public/
-│   │   └── quakeshield-dashboard.png
-│   └── src/                         # React dashboard
-│
-├── quakeshield_pipeline.py          # Main end-to-end pipeline
-├── requirements.txt
-└── README.md
+location_name
+P1_ground_failure_score
+mean_P2_liquefaction_model_score
+spatial_evidence_available
+spatial_anchor_count
+spatial_historical_records
+spatial_mean_ShakeMap_PGA
+spatial_mean_historical_L_rate
+infrastructure_count
+review_context
 ```
 
----
-
-## 🚀 Running the Backend
-
-Install the Python dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the complete pipeline:
-
-```bash
-python quakeshield_pipeline.py
-```
-
-The pipeline processes the hazard models, performs risk fusion, adds infrastructure context, and writes the generated CSV outputs.
-
----
-
-## 🖥️ Running the Dashboard
-
-The dashboard uses **React + Vite + Leaflet**.
-
-From the repository root:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Then open:
+The production output intentionally does not require:
 
 ```text
-http://localhost:5173
+risk_level
+final_risk_score
 ```
 
-### Refreshing Frontend Scenario Data
+---
 
-After generating a new:
+# 15. Frontend
+
+The dashboard is implemented using React/Vite.
+
+Location:
 
 ```text
-outputs/quakeshield_final_output.csv
+frontend/
 ```
 
-regenerate the frontend scenario data with:
+The frontend presents:
 
-```bash
-cd frontend
-python make_frontend_data.py ../outputs/quakeshield_final_output.csv
-```
+* Historical earthquake scenarios
+* P1 indicator
+* P2 indicator
+* Spatial evidence
+* Infrastructure context
+* Review guidance
+* System status
+* Scenario explanations
 
-Then restart the Vite development server if necessary.
+The dashboard does not present a combined risk score or automatic alert.
 
 ---
 
-## 🗺️ Refreshing OpenStreetMap Infrastructure
+# 16. Decision Pipeline
 
-The infrastructure layer can be refreshed using:
+The current conceptual decision pipeline is:
 
-```bash
-python scripts/risk/get_infrastructure.py
-python scripts/risk/calculate_infrastructure_risk.py
+```text
+USGS / Historical Earthquake Data
+             │
+             ▼
+     Earthquake Scenario
+             │
+      ┌──────┴──────┐
+      ▼             ▼
+ P1 Ground       P2 Liquefaction
+ Failure         Indicator
+ Indicator
+      │             │
+      └──────┬──────┘
+             │
+             ▼
+     Spatial Evidence
+             │
+             ▼
+ Infrastructure Context
+             │
+             ▼
+      Human Review
 ```
 
-This requires internet access and the required geospatial/OSM Python packages.
-
-The infrastructure layer currently considers nearby mapped:
-
-* Hospitals
-* Schools
-* Bridges
-* Major roads
+The output is intended to support investigation, not automatically make an emergency decision.
 
 ---
 
-## ⚠️ Limitations
+# 17. Validation
 
-QuakeShield is intentionally presented as a prototype rather than an operational prediction system.
+Architecture validation is performed using:
 
-### Proximity is not exposure
+```text
+validate_hazard_architecture.py
+```
 
-Infrastructure distances are measured from the scenario point/search location. A nearby feature does not necessarily mean that the infrastructure is inside the actual hazard footprint or would be damaged.
+The validation checks:
 
-### OpenStreetMap coverage is incomplete
+* Hazard registry consistency
+* Active model files
+* Production P1 model
+* Production P2 model
+* Production output structure
+* Required columns
+* Forbidden legacy risk fields
+* Spatial evidence context module
+* Infrastructure context module
 
-`none mapped` means that no matching OpenStreetMap feature was returned within the configured search radius. It does **not** mean that the real-world infrastructure does not exist.
+Current validation status:
 
-### No structural damage prediction
+```text
+Registry validation: PASS
+P1 model file: PASS
+P2 model file: PASS
+P1 production model: PASS
+P2 production model: PASS
+Final output: PASS — 9 scenarios
+Spatial Evidence: PASS
+Infrastructure Context: PASS
+Forbidden risk_level: PASS
+Forbidden final_risk_score: PASS
 
-The current system does not model:
-
-* Building vulnerability
-* Structural damage
-* Population exposure
-* Infrastructure fragility
-* Actual economic losses
-* Evacuation requirements
-
-### Priority is a prototype rule
-
-The response-priority flag is a simple decision-support rule based on the current risk level and mapped infrastructure context. It is **not a validated emergency-response model**.
-
-### Limited scenario set
-
-The current demonstration contains 9 scenarios. These results should not be interpreted as historical validation or evidence of real-world predictive performance.
+ARCHITECTURE VALIDATION: PASS
+```
 
 ---
 
-## 🔭 Future Work
+# 18. Implemented vs Future
+
+## Implemented
+
+* Historical earthquake scenarios
+* P1 ground-failure model
+* Earthquake-aware P1 using slope + PGA
+* P1 LOEO validation
+* P1 permutation diagnostic
+* P2 liquefaction model
+* P2 geotechnical model evaluation
+* Verified spatial evidence
+* USGS ShakeMap PGA context
+* Infrastructure mapping context
+* Modular hazard registry
+* Independent P1/P2 hazard modules
+* Architecture validation
+* React dashboard
+* Human-review context
+* P4 research evaluation and rejection
+
+## Future
+
+### Phase 5 — Dynamic Post-Earthquake Intelligence
 
 Potential extensions include:
 
-* Overlaying infrastructure against predicted hazard footprints instead of a point-radius search
-* Adding population and building exposure
-* Incorporating infrastructure vulnerability and fragility
-* Replacing the presence-based priority rule with a distance- and exposure-aware scoring system
-* Mapping ground-failure and liquefaction probabilities spatially
-* Adding uncertainty estimates
-* Validating predictions against historical earthquake impact datasets
-* Expanding the scenario library
+* Real earthquake feeds
+* Post-event environmental data
+* Satellite imagery/change detection
+* Soil and moisture information
+* Rainfall/weather context
+* Ground/seismic observations
+* Dynamic reassessment
+
+### Phase 6 — Authority Decision Support
+
+Potential extensions include:
+
+* Authority dashboard
+* Evidence-based location explanation
+* Supporting evidence visualization
+* Infrastructure context
+* Human verification workflow
+* Review/approve/reject workflow
+
+### Phase 7 — Public Precaution System
+
+Potential extensions include:
+
+* Authority-approved alerts
+* Location-specific precautions
+* Individual notifications
+* Official-information integration
+* False-positive safeguards
+* False-negative safeguards
+
+These capabilities are **future architecture**, not current implemented functionality.
 
 ---
 
-## 🎯 Project Goal
+# 19. Important Scientific Limitations
 
-QuakeShield demonstrates how multiple hazard signals can be combined with infrastructure context to create an **interpretable scenario-level cascading-hazard assessment**.
+The current prototype has several limitations.
 
-The goal is not to claim exact earthquake damage prediction, but to demonstrate a reproducible workflow that connects:
+### P1
+
+The prepared background observations are not confirmed unaffected locations.
+
+The P1 score is not a calibrated probability.
+
+The model is validated on historical earthquake scenarios and should not automatically be interpreted as universally predictive.
+
+### P2
+
+The training database does not contain coordinates.
+
+The current P2 model is therefore not a complete spatial event-specific liquefaction model.
+
+Magnitude-based scenario mapping can produce repeated site usage and should be interpreted cautiously.
+
+### Spatial Evidence
+
+Spatial evidence exists only for selected historical scenarios.
+
+One-record historical cases provide contextual evidence rather than strong statistical support.
+
+Historical evidence is not automatically transferable to every future earthquake.
+
+### Infrastructure
+
+Infrastructure data represents mapped geographic context.
+
+The current system does not estimate structural vulnerability, damage, casualties, or economic loss.
+
+### Overall System
+
+The current prototype does not provide a validated unified risk probability.
+
+Human interpretation remains necessary.
+
+---
+
+# 20. Repository Structure
 
 ```text
-Hazard Models
-      +
-Risk Fusion
-      +
-Infrastructure Context
-      ↓
-Interpretable Scenario Assessment
+TrustLens-push/
+│
+├── HAZARD_ARCHITECTURE.md
+├── README.md
+├── quakeshield_pipeline.py
+├── hazard_registry.py
+├── validate_hazard_architecture.py
+├── connect_hazard_modules.py
+│
+├── hazard_modules/
+│   ├── ground_failure.py
+│   └── liquefaction.py
+│
+├── models/
+│   ├── p1_ground_failure_model_slope_pga.joblib
+│   └── p2_liquefaction_model.joblib
+│
+├── data/
+│   ├── QuakeShield_Final_Dataset_Slope_PGA.csv
+│   └── raw/
+│
+├── scripts/
+│   ├── p1/
+│   └── p2/
+│
+├── outputs/
+│
+└── frontend/
+    ├── src/
+    ├── package.json
+    └── ...
+```
+
+Research artifacts and validation outputs are retained to support reproducibility.
+
+---
+
+# 21. Reproducibility
+
+The project retains:
+
+* Dataset preparation scripts
+* Model training scripts
+* LOEO validation scripts
+* Permutation diagnostics
+* Spatial evidence processing
+* NGL investigation artifacts
+* Architecture validation
+* Hazard module equivalence tests
+
+This allows the current production architecture and rejected research experiments to be reviewed independently.
+
+---
+
+# 22. Project Status
+
+```text
+QUAKESHIELD
+────────────────────────────────────────────
+
+P1 Ground Failure          ACTIVE       ✓
+P2 Liquefaction            ACTIVE       ✓
+E1 Spatial Evidence        ACTIVE       ✓
+C1 Infrastructure Context  ACTIVE       ✓
+
+P3 Landslide               PLANNED      —
+P4 Lateral Spreading       EVALUATED    REJECTED
+
+Combined Risk Score        REMOVED      ✓
+Risk Levels                REMOVED      ✓
+Automatic Alerts           NOT ACTIVE   ✓
+Human Review               REQUIRED     ✓
+
+Architecture Validation    PASS         ✓
 ```
 
 ---
 
-## ⚖️ Disclaimer
+# 23. Final System Definition
 
-**Research/hackathon prototype for demonstration purposes.**
+> **QuakeShield is a modular prototype for screening co-seismic secondary hazards in historical earthquake scenarios. It combines separate ground-failure and liquefaction model indicators with verified spatial evidence and mapped infrastructure context to support human review.**
 
-QuakeShield is not an operational emergency-response system and should not be used to make real-world emergency decisions.
+The architecture is intentionally designed so that future hazard modules and dynamic data sources can be added only after independent validation.
+
+---
+
+## Disclaimer
+
+QuakeShield is a research/prototype decision-support system.
+
+Its outputs should not be used as a substitute for official earthquake information, engineering assessment, emergency-management procedures, or decisions by qualified authorities.

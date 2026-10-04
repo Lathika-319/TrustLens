@@ -1,12 +1,51 @@
-
+# Python environments
 .venv/
 venv/
-node_modules/
-dist/
+env/
+
+# Python cache
 __pycache__/
 *.pyc
-cache/
-*.bak*
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+node_modules/
+dist/
+
+# Environment / secrets
 .env
+.env.*
+!.env.example
+
+# Local caches
+cache/
+*.cache
+
+# Temporary / backup files
+*.bak
+*.bak*
+*.tmp
+*.temp
+*~
+quakeshield_pipeline_backup*.py
+
+# Archives
 *.zip
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Local/generated raw downloads
+palu_pga.covjson
+data/raw/shakemap_cache/
+
+# Frontend generated helper
 frontend/make_frontend_data.py

@@ -1,0 +1,12 @@
+scenario,anchor_group,ngl_site,latitude,longitude,evidence,match_level,earthquake_latitude,earthquake_longitude,earthquake_magnitude,distance_to_epicenter_km
+Kobe,Port Island,Port Island,34.673385,135.205767,NGL mapped Port Island; multiple Kayen records explicitly name Port Island,AREA_ANCHOR,34.583,135.018,6.9,19.904
+Kobe,Port Island,Port Island Site I,34.676456,135.206203,NGL mapped Port Island site; Kayen contains multiple Port Island case histories,AREA_ANCHOR,34.583,135.018,6.9,20.112
+Kobe,Nishinomiya,Nishinomiya-hama,34.716105,135.333039,NGL mapped Nishinomiya-hama; Kayen contains numerous Nishinomiya/Nishinomiyahama records,AREA_ANCHOR,34.583,135.018,6.9,32.396
+Niigata-Chuetsu,Kawagishi-cho,Kawagishi-cho,37.910429,139.027858,"NGL mapped Kawagishi-cho; Kayen contains Meikun High School Hiroba, Kawagishi-Cho",STRONG_SITE_ANCHOR,37.226,138.779,6.6,79.203
+Niigata-Chuetsu,Showa Bridge,"Site E (Showa Bridge, Left Bank)",37.91378,139.04203,"NGL mapped Showa Bridge left bank; Kayen contains South Bank Shinano River, Showa Bridge",STRONG_SITE_ANCHOR,37.226,138.779,6.6,79.914
+Niigata-Chuetsu,Showa Bridge,"Site F (Showa Bridge, Right Bank)",37.91038,139.04288,NGL mapped Showa Bridge right bank; same named Kayen case-history area,STRONG_SITE_ANCHOR,37.226,138.779,6.6,79.574
+Tohoku-Oki,Aomori,Aomori Railway Station,40.828947,140.734833,NGL mapped Aomori Railway Station; Kayen contains Aomori Station,STRONG_SITE_ANCHOR,38.297,142.373,9.1,314.602
+Tohoku-Oki,Takeda,Takeda Elementary School,40.93431,140.415037,Exact Kayen/NGL site-name match,EXACT,38.297,142.373,9.1,337.803
+Tohoku-Oki,Arahama,"Arahama (A-9, Sewage Plant)",38.04258,140.919003,Strong Kayen/NGL site-name match,STRONG_SITE_ANCHOR,38.297,142.373,9.1,130.217
+Tohoku-Oki,Yuriage,Yuriagekami,38.189551,140.934866,NGL mapped Yuriage area; Kayen contains Yuriage case histories,AREA_ANCHOR,38.297,142.373,9.1,126.16
+Tohoku-Oki,Yuriage,Yuriage Bridge,38.182134,140.946729,NGL mapped Yuriage Bridge; Kayen contains Yuriage-Ohashi,STRONG_SITE_ANCHOR,38.297,142.373,9.1,125.217

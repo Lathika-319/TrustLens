@@ -1,165 +1,400 @@
+
+# ============================================================
+# QUAKESHIELD â€” HISTORICAL SECONDARY-HAZARD SCREENING PIPELINE
+# ============================================================
+#
+# CURRENT PROTOTYPE
+#
+# P1 = Ground-failure model indicator
+# P2 = Liquefaction model indicator
+# Spatial evidence = historical cases + NGL anchors + ShakeMap PGA
+# Infrastructure = mapped infrastructure context
+#
+# IMPORTANT:
+# - No combined risk probability
+# - No HIGH/MEDIUM/LOW risk classification
+# - No automatic public alerts
+# - P1/P2 scores are model indicators, not calibrated probabilities
+# - Infrastructure is contextual proximity information
+#
+# P1 CURRENT MODEL:
+# - Slope + PGA
+# - slope_degrees
+# - PGA_g
+# ============================================================
+
 import os
-import joblib
 import numpy as np
 import pandas as pd
 
+from hazard_modules import (
+    ground_failure,
+    liquefaction
+)
+
+from hazard_registry import (
+    get_active_hazard_modules,
+    get_context_modules,
+    validate_registry
+)
+# ============================================================
+# HAZARD REGISTRY VALIDATION
+# ============================================================
+
+registry_errors = validate_registry()
+
+if registry_errors:
+
+    print("ERROR: Hazard registry validation failed.")
+
+    for error in registry_errors:
+        print(f"  - {error}")
+
+    raise RuntimeError(
+        "QuakeShield hazard registry is invalid."
+    )
+
+active_hazard_modules = get_active_hazard_modules()
+context_modules = get_context_modules()
+
+print(
+    "Hazard registry loaded:",
+    ", ".join(
+        module["id"]
+        for module in active_hazard_modules
+    )
+)
+
+print(
+    "Context modules loaded:",
+    ", ".join(
+        module["id"]
+        for module in context_modules
+    )
+)
+# ============================================================
+# 1. CONFIGURATION
+# ============================================================
+
+P1_MODEL_FILE = r"models\p1_ground_failure_model_slope_pga.joblib"
+P2_MODEL_FILE = r"models\p2_liquefaction_model.joblib"
+
+P1_FILE = r"data\QuakeShield_Final_Dataset_Slope_PGA.csv"
+P2_FILE = r"data\raw\Database 7.xlsx"
+
+INFRASTRUCTURE_FILE = r"outputs\infrastructure_risk.csv"
+SPATIAL_CONTEXT_FILE = r"outputs\p2_review_context.csv"
+
+FINAL_OUTPUT_FILE = r"outputs\quakeshield_final_output.csv"
+MAP_OUTPUT_FILE = r"outputs\quakeshield_map_data.csv"
+EXPLANATION_OUTPUT_FILE = r"outputs\quakeshield_explanations.csv"
+
 
 # ============================================================
-# QUAKESHIELD - END-TO-END PIPELINE
-# ============================================================
-
-print("=" * 70)
-print("QUAKESHIELD END-TO-END PIPELINE")
-print("=" * 70)
-
-
-# ============================================================
-# FILE PATHS
-# ============================================================
-
-p1_model_file = r"models\p1_ground_failure_model.joblib"
-p2_model_file = r"models\p2_liquefaction_model.joblib"
-
-p1_file = r"data\raw\QuakeShield_Final_Dataset.csv"
-p2_file = r"data\raw\Database 7.xlsx"
-
-infrastructure_file = r"outputs\infrastructure_risk.csv"
-
-output_file = r"outputs\quakeshield_final_output.csv"
-map_output_file = r"outputs\quakeshield_map_data.csv"
-explanation_file = r"outputs\quakeshield_explanations.csv"
-risk_input_file = r"outputs\risk_fusion_inputs.csv"
-
-
-# ============================================================
-# CREATE OUTPUT DIRECTORY
+# 2. OUTPUT DIRECTORY
 # ============================================================
 
 os.makedirs("outputs", exist_ok=True)
 
 
 # ============================================================
-# 1. LOAD MODELS
+# 3. HELPERS
 # ============================================================
 
-print("\nLoading trained models...")
+def safe_read_csv(path):
 
-p1_model = joblib.load(p1_model_file)
-p2_model = joblib.load(p2_model_file)
+    if not os.path.exists(path):
+        print(f"WARNING: File not found: {path}")
+        return pd.DataFrame()
 
-print("Models loaded successfully.")
+    try:
+        return pd.read_csv(path)
 
-
-# ============================================================
-# 2. LOAD P1 DATASET
-# ============================================================
-
-print("\nLoading P1 ground-failure dataset...")
-
-p1_df = pd.read_csv(p1_file)
-
-print(f"P1 dataset loaded: {len(p1_df)} rows")
+    except Exception as exc:
+        print(f"WARNING: Could not read {path}")
+        print(exc)
+        return pd.DataFrame()
 
 
-# ============================================================
-# 3. P1 FEATURE ENGINEERING
-# ============================================================
+def clean_numeric(series):
 
-p1_df["depth_missing"] = (
-    p1_df["earthquake_depth_km"]
-    .isna()
-    .astype(int)
-)
-
-p1_df["elevation_missing"] = (
-    p1_df["elevation_m"]
-    .isna()
-    .astype(int)
-)
-
-p1_df["magnitude_distance_ratio"] = (
-    p1_df["earthquake_magnitude"]
-    /
-    (p1_df["distance_to_epicenter_km"] + 1)
-)
-
-p1_df["magnitude_distance_interaction"] = (
-    p1_df["earthquake_magnitude"]
-    *
-    p1_df["distance_to_epicenter_km"]
-)
-
-p1_df["depth_distance_ratio"] = (
-    p1_df["earthquake_depth_km"]
-    /
-    (p1_df["distance_to_epicenter_km"] + 1)
-)
-
-p1_df["log_elevation"] = np.log1p(
-    np.maximum(
-        p1_df["elevation_m"],
-        0
+    return pd.to_numeric(
+        series,
+        errors="coerce"
     )
-)
+
+
+def format_distance(value):
+
+    if pd.isna(value):
+        return "N/A"
+
+    try:
+        return f"{float(value):.2f} km"
+
+    except Exception:
+        return str(value)
+
+
+def model_score_description(value):
+
+    if pd.isna(value):
+        return "not available"
+
+    return f"{float(value):.3f}"
 
 
 # ============================================================
-# P1 FEATURES
+# 4. HEADER
 # ============================================================
 
-p1_features = [
-    "earthquake_magnitude",
-    "earthquake_depth_km",
-    "distance_to_epicenter_km",
-    "elevation_m",
-    "depth_missing",
-    "elevation_missing",
-    "magnitude_distance_ratio",
-    "magnitude_distance_interaction",
-    "depth_distance_ratio",
-    "log_elevation"
-]
-
-X_p1 = p1_df[p1_features]
+print()
+print("============================================================")
+print("QUAKESHIELD PIPELINE")
+print("============================================================")
 
 
 # ============================================================
-# 4. P1 PREDICTIONS
+# 5. LOAD P1 MODEL
 # ============================================================
 
-p1_df["P1_ground_failure_probability"] = (
-    p1_model.predict_proba(X_p1)[:, 1]
+print()
+print("Loading P1 ground-failure model...")
+
+if not os.path.exists(P1_MODEL_FILE):
+
+    raise FileNotFoundError(
+        f"P1 model not found: {P1_MODEL_FILE}"
+    )
+
+p1_model = ground_failure.load_model(
+    P1_MODEL_FILE
 )
 
 print(
-    f"P1 predictions completed: "
-    f"{len(p1_df)} locations"
+    f"P1 model loaded: {P1_MODEL_FILE}"
+)
+
+print(
+    "P1 features: slope_degrees + PGA_g"
 )
 
 
 # ============================================================
-# 5. AGGREGATE P1 BY EARTHQUAKE
+# 6. LOAD P1 DATASET
+# ============================================================
+
+print()
+print("Loading P1 dataset...")
+
+if not os.path.exists(P1_FILE):
+
+    raise FileNotFoundError(
+        f"P1 dataset not found: {P1_FILE}"
+    )
+
+p1_data = pd.read_csv(
+    P1_FILE
+)
+
+print(
+    f"P1 rows: {len(p1_data):,}"
+)
+
+
+# ============================================================
+# 7. VERIFY ACTUAL P1 COLUMNS
+# ============================================================
+
+required_p1_columns = [
+
+    "grid_x",
+    "grid_y",
+
+    "longitude",
+    "latitude",
+
+    "label",
+    "label_name",
+
+    "earthquake_id",
+    "earthquake_name",
+    "earthquake_date",
+
+    "earthquake_magnitude",
+    "earthquake_latitude",
+    "earthquake_longitude",
+    "earthquake_depth_km",
+
+    "mapping_confidence",
+
+    "distance_to_epicenter_km",
+
+    "elevation_m",
+
+    "slope_degrees",
+
+    "PGA_g"
+]
+
+
+missing_p1_columns = [
+
+    column
+    for column in required_p1_columns
+    if column not in p1_data.columns
+
+]
+
+
+if missing_p1_columns:
+
+    raise ValueError(
+        "Missing P1 columns: "
+        + ", ".join(missing_p1_columns)
+    )
+
+
+# ============================================================
+# 8. P1 NUMERIC CLEANING
+# ============================================================
+
+numeric_p1_columns = [
+
+    "longitude",
+    "latitude",
+
+    "earthquake_magnitude",
+
+    "earthquake_latitude",
+    "earthquake_longitude",
+
+    "earthquake_depth_km",
+
+    "distance_to_epicenter_km",
+
+    "elevation_m",
+
+    "slope_degrees",
+
+    "PGA_g"
+
+]
+
+
+for column in numeric_p1_columns:
+
+    p1_data[column] = clean_numeric(
+        p1_data[column]
+    )
+
+
+# ============================================================
+# 9. P1 MODEL PREDICTION
+# ============================================================
+
+print()
+print("Running P1 ground-failure model...")
+print("Features: slope_degrees + PGA_g")
+
+p1_features = p1_data[
+    [
+        "slope_degrees",
+        "PGA_g"
+    ]
+].copy()
+
+
+p1_scores = ground_failure.predict_scores(
+    p1_features,
+    model=p1_model
+)
+
+
+p1_data[
+    "P1_model_score"
+] = p1_scores
+
+
+# ============================================================
+# 10. AGGREGATE P1 BY EARTHQUAKE
+# ============================================================
+
+p1_group_columns = [
+
+    "earthquake_id",
+
+    "earthquake_name",
+
+    "earthquake_date",
+
+    "earthquake_magnitude",
+
+    "earthquake_latitude",
+
+    "earthquake_longitude",
+
+    "earthquake_depth_km"
+
+]
+
+
+p1_scenarios = (
+
+    p1_data
+
+    .groupby(
+        p1_group_columns,
+        dropna=False
+    )
+
+    .agg(
+
+        P1_ground_failure_score=(
+            "P1_model_score",
+            "mean"
+        ),
+
+        P1_sample_count=(
+            "P1_model_score",
+            "count"
+        )
+
+    )
+
+    .reset_index()
+
+)
+
+
+# ============================================================
+# 11. RENAME SCENARIO FIELDS
 # ============================================================
 
 p1_scenarios = (
-    p1_df
-    .groupby(
-        [
-            "earthquake_id",
-            "earthquake_name",
-            "earthquake_date"
-        ],
-        as_index=False
+
+    p1_scenarios
+
+    .rename(
+        columns={
+
+            "earthquake_name":
+                "location_name",
+
+            "earthquake_magnitude":
+                "magnitude",
+
+            "earthquake_latitude":
+                "latitude",
+
+            "earthquake_longitude":
+                "longitude"
+
+        }
     )
-    .agg(
-        latitude=("latitude", "first"),
-        longitude=("longitude", "first"),
-        P1_ground_failure_probability=(
-            "P1_ground_failure_probability",
-            "mean"
-        )
-    )
+
 )
+
 
 print(
     f"P1 earthquake scenarios: "
@@ -168,59 +403,61 @@ print(
 
 
 # ============================================================
-# 6. LOAD P2 DATASET
+# 12. LOAD P2 MODEL
 # ============================================================
 
-print("\nLoading P2 liquefaction dataset...")
+print()
+print("Loading P2 liquefaction model...")
 
-p2_df = pd.read_excel(
-    p2_file,
-    sheet_name="Liq database"
-)
+if not os.path.exists(P2_MODEL_FILE):
 
-print(
-    f"P2 dataset loaded: "
-    f"{len(p2_df)} rows"
-)
-
-
-# ============================================================
-# 7. CLEAN P2 FC COLUMN
-# ============================================================
-
-p2_df["FC (%)"] = pd.to_numeric(
-    p2_df["FC (%)"],
-    errors="coerce"
-)
-
-
-# ============================================================
-# 8. P2 MISSING VALUE FEATURES
-# ============================================================
-
-p2_missing_columns = [
-    "(N1)60",
-    "qt1N",
-    "Ic",
-    "VS1 (m/s)",
-    "FC (%)"
-]
-
-for column in p2_missing_columns:
-
-    p2_df[column + "_missing"] = (
-        p2_df[column]
-        .isna()
-        .astype(int)
+    raise FileNotFoundError(
+        f"P2 model not found: {P2_MODEL_FILE}"
     )
 
 
+p2_model = liquefaction.load_model(
+    P2_MODEL_FILE
+)
+
+
+print(
+    f"P2 model loaded: {P2_MODEL_FILE}"
+)
+
+
 # ============================================================
-# 9. P2 FEATURES
+# 13. LOAD P2 DATASET
 # ============================================================
 
-p2_features = [
-    "σv/σv'",
+print()
+print("Loading P2 liquefaction dataset...")
+
+if not os.path.exists(P2_FILE):
+
+    raise FileNotFoundError(
+        f"P2 dataset not found: {P2_FILE}"
+    )
+
+
+p2_data = pd.read_excel(
+    P2_FILE,
+    sheet_name="Liq database"
+)
+
+
+print(
+    f"P2 rows: {len(p2_data):,}"
+)
+
+
+# ============================================================
+# 14. P2 FEATURES
+# ============================================================
+
+p2_base_features = [
+
+    "Ïƒv/Ïƒv'",
     "(N1)60",
     "qt1N",
     "Ic",
@@ -228,56 +465,163 @@ p2_features = [
     "FC (%)",
     "Depth (m)",
     "Mw",
-    "PGA(g)",
-    "(N1)60_missing",
-    "qt1N_missing",
-    "Ic_missing",
-    "VS1 (m/s)_missing",
-    "FC (%)_missing"
+    "PGA(g)"
+
 ]
 
-X_p2 = p2_df[p2_features]
+
+p2_missing_source_features = [
+
+    "(N1)60",
+    "qt1N",
+    "Ic",
+    "VS1 (m/s)",
+    "FC (%)"
+
+]
 
 
 # ============================================================
-# 10. P2 PREDICTIONS
+# 15. VERIFY P2 COLUMNS
 # ============================================================
 
-p2_df["P2_liquefaction_probability"] = (
-    p2_model.predict_proba(X_p2)[:, 1]
+missing_p2_columns = [
+
+    column
+
+    for column
+    in p2_base_features
+
+    if column
+    not in p2_data.columns
+
+]
+
+
+if missing_p2_columns:
+
+    raise ValueError(
+        "Missing P2 columns: "
+        + ", ".join(missing_p2_columns)
+    )
+
+
+# ============================================================
+# 16. CREATE P2 MISSINGNESS FEATURES
+# ============================================================
+
+for column in p2_missing_source_features:
+
+    missing_column = (
+        f"{column}_missing"
+    )
+
+    p2_data[
+        missing_column
+    ] = (
+
+        p2_data[column]
+
+        .isna()
+
+        .astype(int)
+
+    )
+
+
+# ============================================================
+# 17. CLEAN P2 NUMERIC FEATURES
+# ============================================================
+
+for column in p2_base_features:
+
+    p2_data[column] = clean_numeric(
+        p2_data[column]
+    )
+
+
+# ============================================================
+# 18. P2 FEATURE LIST
+# ============================================================
+
+p2_feature_columns = (
+
+    p2_base_features
+
+    +
+
+    [
+        f"{column}_missing"
+        for column
+        in p2_missing_source_features
+    ]
+
 )
 
-print(
-    f"P2 predictions completed: "
-    f"{len(p2_df)} sites"
+
+# ============================================================
+# 19. RUN P2 MODEL
+# ============================================================
+
+print()
+print("Running P2 liquefaction model...")
+
+
+p2_scores = liquefaction.predict_scores(
+    p2_data[
+        p2_feature_columns
+    ],
+    model=p2_model
 )
 
 
+p2_data[
+    "P2_model_score"
+] = p2_scores
+
+
 # ============================================================
-# 11. AGGREGATE P2 BY MAGNITUDE
+# 20. AGGREGATE P2 BY MAGNITUDE
 # ============================================================
 
 p2_scenarios = (
-    p2_df
+
+    p2_data
+
     .groupby(
         "Mw",
-        as_index=False
+        dropna=False
     )
+
     .agg(
-        mean_P2_liquefaction_probability=(
-            "P2_liquefaction_probability",
+
+        mean_P2_liquefaction_model_score=(
+
+            "P2_model_score",
             "mean"
+
         ),
-        max_P2_liquefaction_probability=(
-            "P2_liquefaction_probability",
+
+        max_P2_liquefaction_model_score=(
+
+            "P2_model_score",
             "max"
+
         ),
+
         p2_site_count=(
-            "P2_liquefaction_probability",
+
+            "P2_model_score",
             "count"
+
         )
+
     )
+
+    .reset_index()
+
 )
+
 
 print(
     f"P2 magnitude scenarios: "
@@ -286,494 +630,761 @@ print(
 
 
 # ============================================================
-# 12. MATCH P1 EARTHQUAKE TO NEAREST P2 MAGNITUDE
+# 21. FIND NEAREST P2 MAGNITUDE
 # ============================================================
 
-def find_nearest_magnitude(magnitude):
+def nearest_p2_magnitude(magnitude):
 
-    differences = abs(
-        p2_scenarios["Mw"]
-        - magnitude
-    )
+    if pd.isna(magnitude):
 
-    index = differences.idxmin()
-
-    return p2_scenarios.loc[index]
+        return np.nan
 
 
-matched_rows = []
+    valid_magnitudes = (
 
+        p2_scenarios[
+            "Mw"
+        ]
 
-for _, row in p1_scenarios.iterrows():
+        .dropna()
 
-    magnitude = p1_df.loc[
-        p1_df["earthquake_id"]
-        == row["earthquake_id"],
-        "earthquake_magnitude"
-    ].iloc[0]
+        .unique()
 
-    nearest_p2 = find_nearest_magnitude(
-        magnitude
-    )
-
-    matched_rows.append(
-        {
-            "earthquake_id":
-                row["earthquake_id"],
-
-            "location_name":
-                row["earthquake_name"],
-
-            "earthquake_date":
-                row["earthquake_date"],
-
-            "latitude":
-                row["latitude"],
-
-            "longitude":
-                row["longitude"],
-
-            "magnitude":
-                magnitude,
-
-            "P1_ground_failure_probability":
-                row[
-                    "P1_ground_failure_probability"
-                ],
-
-            "matched_P2_Mw":
-                nearest_p2["Mw"],
-
-            "mean_P2_liquefaction_probability":
-                nearest_p2[
-                    "mean_P2_liquefaction_probability"
-                ],
-
-            "max_P2_liquefaction_probability":
-                nearest_p2[
-                    "max_P2_liquefaction_probability"
-                ],
-
-            "p2_site_count":
-                nearest_p2[
-                    "p2_site_count"
-                ]
-        }
     )
 
 
-fusion = pd.DataFrame(
-    matched_rows
-)
+    if len(valid_magnitudes) == 0:
+
+        return np.nan
 
 
-# ============================================================
-# 13. SAVE RISK FUSION INPUTS
-# ============================================================
+    return min(
 
-fusion.to_csv(
-    risk_input_file,
-    index=False
-)
+        valid_magnitudes,
+
+        key=lambda value:
+            abs(
+                float(value)
+                -
+                float(magnitude)
+            )
+
+    )
 
 
-# ============================================================
-# 14. RISK FUSION
-# ============================================================
+p1_scenarios[
+    "matched_P2_Mw"
+] = (
 
-fusion["final_risk_score"] = (
-    fusion[
-        "P1_ground_failure_probability"
+    p1_scenarios[
+        "magnitude"
     ]
-    *
-    fusion[
-        "mean_P2_liquefaction_probability"
-    ]
+
+    .apply(
+        nearest_p2_magnitude
+    )
+
 )
 
 
 # ============================================================
-# 15. RISK LEVEL
+# 22. COMBINE P1 + P2
 # ============================================================
 
-def classify_risk(score):
+fusion = p1_scenarios.merge(
 
-    if score >= 0.60:
-        return "HIGH"
+    p2_scenarios,
 
-    elif score >= 0.30:
-        return "MEDIUM"
+    left_on="matched_P2_Mw",
 
-    else:
-        return "LOW"
+    right_on="Mw",
 
+    how="left"
 
-fusion["risk_level"] = (
-    fusion[
-        "final_risk_score"
-    ]
-    .apply(classify_risk)
 )
 
 
+if "Mw" in fusion.columns:
+
+    fusion.drop(
+        columns=["Mw"],
+        inplace=True
+    )
+
+
 # ============================================================
-# 16. LOAD INFRASTRUCTURE PROXIMITY
+# 23. LOAD SPATIAL REVIEW CONTEXT
 # ============================================================
+
+print()
+print("Loading spatial review context...")
+
+
+spatial_context = safe_read_csv(
+    SPATIAL_CONTEXT_FILE
+)
+
 
 print(
-    "\nLoading infrastructure proximity layer..."
-)
-
-
-if os.path.exists(
-    infrastructure_file
-):
-
-    infrastructure = pd.read_csv(
-        infrastructure_file
-    )
-
-    print(
-        f"Infrastructure records: "
-        f"{len(infrastructure)} scenarios"
-    )
-
-else:
-
-    print(
-        "WARNING: infrastructure_risk.csv "
-        "not found."
-    )
-
-    infrastructure = pd.DataFrame(
-        columns=[
-            "earthquake_id",
-            "nearby_hospital",
-            "nearby_school",
-            "nearby_bridge",
-            "nearby_road",
-            "nearest_hospital_km",
-            "nearest_school_km",
-            "nearest_bridge_km",
-            "nearest_road_km",
-            "infrastructure_count"
-        ]
-    )
-
-
-# ============================================================
-# 17. INFRASTRUCTURE COLUMNS
-# ============================================================
-
-infra_columns = [
-    "earthquake_id",
-    "nearby_hospital",
-    "nearby_school",
-    "nearby_bridge",
-    "nearby_road",
-    "nearest_hospital_km",
-    "nearest_school_km",
-    "nearest_bridge_km",
-    "nearest_road_km",
-    "infrastructure_count"
-]
-
-
-# Keep only columns that actually exist
-
-available_infra_columns = [
-    column
-    for column in infra_columns
-    if column in infrastructure.columns
-]
-
-
-infrastructure = infrastructure[
-    available_infra_columns
-]
-
-
-# ============================================================
-# 18. MERGE INFRASTRUCTURE
-# ============================================================
-
-fusion = fusion.merge(
-    infrastructure,
-    on="earthquake_id",
-    how="left"
+    f"Spatial context rows: "
+    f"{len(spatial_context)}"
 )
 
 
 # ============================================================
-# 19. FILL INFRASTRUCTURE FLAGS
+# 24. MATCH SPATIAL CONTEXT
 # ============================================================
 
-flag_columns = [
-    "nearby_hospital",
-    "nearby_school",
-    "nearby_bridge",
-    "nearby_road"
-]
+scenario_map = {
+
+    "Tohoku-Oki, Japan":
+        "Tohoku-Oki",
+
+    "Kobe, Japan":
+        "Kobe",
+
+    "Niigata-Chuetsu, Japan":
+        "Niigata-Chuetsu"
+
+}
 
 
-for column in flag_columns:
-
-    if column not in fusion.columns:
-
-        fusion[column] = 0
-
-    else:
-
-        fusion[column] = (
-            fusion[column]
-            .fillna(0)
-            .astype(int)
-        )
-
-
-# ============================================================
-# 20. FILL INFRASTRUCTURE COUNT
-# ============================================================
-
-if "infrastructure_count" not in fusion.columns:
+fusion[
+    "spatial_evidence_scenario"
+] = (
 
     fusion[
-        "infrastructure_count"
-    ] = (
-        fusion["nearby_hospital"]
-        + fusion["nearby_school"]
-        + fusion["nearby_bridge"]
-        + fusion["nearby_road"]
-    )
-
-else:
-
-    fusion[
-        "infrastructure_count"
-    ] = (
-        fusion[
-            "infrastructure_count"
-        ]
-        .fillna(0)
-        .astype(int)
-    )
-
-
-# ============================================================
-# 21. PRIORITY CLASSIFICATION
-# ============================================================
-
-def classify_priority(row):
-
-    risk_level = row[
-        "risk_level"
+        "location_name"
     ]
 
-    infrastructure_count = row[
-        "infrastructure_count"
+    .map(
+        scenario_map
+    )
+
+)
+
+
+fusion[
+    "spatial_anchor_count"
+] = np.nan
+
+
+fusion[
+    "spatial_historical_records"
+] = np.nan
+
+
+fusion[
+    "spatial_mean_ShakeMap_PGA"
+] = np.nan
+
+
+fusion[
+    "spatial_mean_historical_L_rate"
+] = np.nan
+
+
+fusion[
+    "spatial_evidence_available"
+] = False
+
+
+if not spatial_context.empty:
+
+    spatial_context_columns = [
+
+        "spatial_evidence_scenario",
+
+        "spatial_anchor_count",
+
+        "spatial_historical_records",
+
+        "spatial_mean_ShakeMap_PGA",
+
+        "spatial_mean_historical_L_rate",
+
+        "spatial_evidence_available"
+
     ]
 
 
-    if risk_level == "HIGH":
+    available_spatial_columns = [
 
-        return "IMMEDIATE ASSESSMENT"
+        column
+
+        for column
+        in spatial_context_columns
+
+        if column
+        in spatial_context.columns
+
+    ]
 
 
-    elif (
-        risk_level == "MEDIUM"
-        and infrastructure_count > 0
+    if (
+        "spatial_evidence_scenario"
+        in available_spatial_columns
     ):
 
-        return (
-            "PRIORITIZE - "
-            "INFRASTRUCTURE NEARBY"
+        spatial_lookup = (
+
+            spatial_context[
+                available_spatial_columns
+            ]
+
+            .drop_duplicates(
+
+                subset=[
+                    "spatial_evidence_scenario"
+                ]
+
+            )
+
+            .set_index(
+                "spatial_evidence_scenario"
+            )
+
         )
 
 
-    elif risk_level == "MEDIUM":
+        for column in [
 
-        return (
-            "MONITOR / "
-            "FURTHER ASSESSMENT"
-        )
+            "spatial_anchor_count",
+
+            "spatial_historical_records",
+
+            "spatial_mean_ShakeMap_PGA",
+
+            "spatial_mean_historical_L_rate"
+
+        ]:
+
+            if (
+                column
+                in spatial_lookup.columns
+            ):
+
+                fusion[column] = (
+
+                    fusion[
+                        "spatial_evidence_scenario"
+                    ]
+
+                    .map(
+                        spatial_lookup[column]
+                    )
+
+                )
 
 
-    else:
+        if (
+            "spatial_evidence_available"
+            in spatial_lookup.columns
+        ):
 
-        return "LOWER PRIORITY"
+            fusion[
+                "spatial_evidence_available"
+            ] = (
+
+                fusion[
+                    "spatial_evidence_scenario"
+                ]
+
+                .map(
+
+                    spatial_lookup[
+                        "spatial_evidence_available"
+                    ]
+
+                )
+
+                .fillna(False)
+
+                .astype(bool)
+
+            )
 
 
-fusion["priority_level"] = (
-    fusion
-    .apply(
-        classify_priority,
-        axis=1
-    )
+# ============================================================
+# 25. KEEP P1 AND P2 SEPARATE
+# ============================================================
+
+fusion[
+    "p1_indicator"
+] = (
+
+    fusion[
+        "P1_ground_failure_score"
+    ]
+
+)
+
+
+fusion[
+    "p2_indicator"
+] = (
+
+    fusion[
+        "mean_P2_liquefaction_model_score"
+    ]
+
+)
+
+
+fusion[
+    "review_status"
+] = (
+
+    "REVIEW USING SEPARATE HAZARD INDICATORS"
+
 )
 
 
 # ============================================================
-# 22. GENERATE EXPLANATIONS
+# 26. LOAD INFRASTRUCTURE CONTEXT
 # ============================================================
 
-def format_distance(value):
-
-    if pd.isna(value):
-
-        return "No mapped feature"
-
-    return f"{value:.2f} km"
+print()
+print("Loading infrastructure context...")
 
 
-def generate_explanation(row):
-
-    p1 = row[
-        "P1_ground_failure_probability"
-    ]
-
-    p2 = row[
-        "mean_P2_liquefaction_probability"
-    ]
-
-    score = row[
-        "final_risk_score"
-    ]
-
-    risk = row[
-        "risk_level"
-    ]
-
-    priority = row[
-        "priority_level"
-    ]
+infrastructure = safe_read_csv(
+    INFRASTRUCTURE_FILE
+)
 
 
-    hospital_distance = (
-        format_distance(
-            row.get(
-                "nearest_hospital_km",
-                np.nan
-            )
-        )
-    )
-
-    school_distance = (
-        format_distance(
-            row.get(
-                "nearest_school_km",
-                np.nan
-            )
-        )
-    )
-
-    bridge_distance = (
-        format_distance(
-            row.get(
-                "nearest_bridge_km",
-                np.nan
-            )
-        )
-    )
-
-    road_distance = (
-        format_distance(
-            row.get(
-                "nearest_road_km",
-                np.nan
-            )
-        )
-    )
-
-
-    return (
-        f"Ground-failure probability is "
-        f"{p1:.3f}, while the matched "
-        f"liquefaction probability is "
-        f"{p2:.3f}. The combined scenario "
-        f"risk indicator is {score:.3f}, "
-        f"classified as {risk}. "
-
-        f"Nearest mapped hospital: "
-        f"{hospital_distance}; "
-
-        f"nearest school: "
-        f"{school_distance}; "
-
-        f"nearest bridge: "
-        f"{bridge_distance}; "
-
-        f"nearest major road: "
-        f"{road_distance}. "
-
-        f"Priority: {priority}."
-    )
-
-
-fusion["explanation"] = (
-    fusion
-    .apply(
-        generate_explanation,
-        axis=1
-    )
+print(
+    f"Infrastructure rows: "
+    f"{len(infrastructure)}"
 )
 
 
 # ============================================================
-# 23. FINAL OUTPUT
+# 27. MERGE INFRASTRUCTURE
 # ============================================================
 
-final_columns = [
+infrastructure_columns = [
+
     "earthquake_id",
+
     "location_name",
-    "earthquake_date",
-    "latitude",
-    "longitude",
-    "magnitude",
-
-    "P1_ground_failure_probability",
-
-    "matched_P2_Mw",
-
-    "mean_P2_liquefaction_probability",
-
-    "max_P2_liquefaction_probability",
-
-    "p2_site_count",
-
-    "final_risk_score",
-
-    "risk_level",
-
-    "nearby_hospital",
-    "nearby_school",
-    "nearby_bridge",
-    "nearby_road",
-
-    "nearest_hospital_km",
-    "nearest_school_km",
-    "nearest_bridge_km",
-    "nearest_road_km",
 
     "infrastructure_count",
 
-    "priority_level",
+    "nearest_infrastructure_distance_km",
 
-    "explanation"
+    "hospital_count",
+
+    "school_count",
+
+    "bridge_count",
+
+    "road_count"
+
 ]
 
 
-# Make sure optional distance columns exist
+if not infrastructure.empty:
 
-for column in [
-    "nearest_hospital_km",
-    "nearest_school_km",
-    "nearest_bridge_km",
-    "nearest_road_km"
-]:
+    available_infrastructure_columns = [
+
+        column
+
+        for column
+        in infrastructure_columns
+
+        if column
+        in infrastructure.columns
+
+    ]
+
+
+    infrastructure_lookup = (
+
+        infrastructure[
+            available_infrastructure_columns
+        ]
+
+        .drop_duplicates()
+
+    )
+
+
+    merge_keys = [
+
+        column
+
+        for column in [
+
+            "earthquake_id",
+
+            "location_name"
+
+        ]
+
+        if (
+
+            column in fusion.columns
+
+            and
+
+            column in infrastructure_lookup.columns
+
+        )
+
+    ]
+
+
+    if merge_keys:
+
+        fusion = fusion.merge(
+
+            infrastructure_lookup,
+
+            on=merge_keys,
+
+            how="left",
+
+            suffixes=(
+                "",
+                "_infra"
+            )
+
+        )
+
+
+# ============================================================
+# 28. ENSURE INFRASTRUCTURE COLUMNS EXIST
+# ============================================================
+
+infrastructure_numeric_columns = [
+
+    "infrastructure_count",
+
+    "nearest_infrastructure_distance_km",
+
+    "hospital_count",
+
+    "school_count",
+
+    "bridge_count",
+
+    "road_count"
+
+]
+
+
+for column in infrastructure_numeric_columns:
 
     if column not in fusion.columns:
 
         fusion[column] = np.nan
+
+
+# ============================================================
+# 29. REVIEW CONTEXT
+# ============================================================
+
+fusion[
+    "review_context"
+] = np.where(
+
+    fusion[
+        "spatial_evidence_available"
+    ],
+
+    "SPATIAL EVIDENCE AVAILABLE FOR REVIEW",
+
+    "NO VERIFIED SPATIAL EVIDENCE IN CURRENT PROTOTYPE"
+
+)
+
+
+# Compatibility field only.
+# NOT a risk level.
+
+fusion[
+    "priority_level"
+] = fusion[
+    "review_context"
+]
+
+
+# ============================================================
+# 30. GENERATE EXPLANATION
+# ============================================================
+
+def generate_explanation(row):
+
+    location = row.get(
+        "location_name",
+        "Unknown scenario"
+    )
+
+
+    p1_score = row.get(
+        "P1_ground_failure_score",
+        np.nan
+    )
+
+
+    p2_score = row.get(
+        "mean_P2_liquefaction_model_score",
+        np.nan
+    )
+
+
+    spatial_available = bool(
+
+        row.get(
+            "spatial_evidence_available",
+            False
+        )
+
+    )
+
+
+    infrastructure_count = row.get(
+
+        "infrastructure_count",
+        np.nan
+
+    )
+
+
+    nearest_distance = row.get(
+
+        "nearest_infrastructure_distance_km",
+        np.nan
+
+    )
+
+
+    parts = []
+
+
+    parts.append(
+
+        f"{location}: "
+
+        f"P1 ground-failure model score "
+
+        f"is {model_score_description(p1_score)}."
+
+    )
+
+
+    parts.append(
+
+        f"P2 liquefaction model score "
+
+        f"is {model_score_description(p2_score)}."
+
+    )
+
+
+    if spatial_available:
+
+        anchor_count = row.get(
+
+            "spatial_anchor_count",
+            np.nan
+
+        )
+
+
+        historical_records = row.get(
+
+            "spatial_historical_records",
+            np.nan
+
+        )
+
+
+        mean_pga = row.get(
+
+            "spatial_mean_ShakeMap_PGA",
+            np.nan
+
+        )
+
+
+        historical_l_rate = row.get(
+
+            "spatial_mean_historical_L_rate",
+            np.nan
+
+        )
+
+
+        parts.append(
+
+            "Verified spatial evidence is available "
+            "for review."
+
+        )
+
+
+        if not pd.isna(anchor_count):
+
+            parts.append(
+
+                f"{int(anchor_count)} mapped anchors "
+                f"and "
+                f"{int(historical_records) if not pd.isna(historical_records) else 0} "
+                f"historical records are represented."
+
+            )
+
+
+        if not pd.isna(mean_pga):
+
+            parts.append(
+
+                f"Mean current ShakeMap PGA across "
+                f"the anchors is {mean_pga:.3f} g."
+
+            )
+
+
+        if not pd.isna(historical_l_rate):
+
+            parts.append(
+
+                f"Historical liquefaction outcome rate "
+                f"across the matched evidence is "
+                f"{historical_l_rate:.3f}."
+
+            )
+
+
+    else:
+
+        parts.append(
+
+            "No verified spatial evidence is "
+            "available for this scenario in the "
+            "current prototype."
+
+        )
+
+
+    if not pd.isna(infrastructure_count):
+
+        parts.append(
+
+            f"Mapped infrastructure query returned "
+            f"{int(infrastructure_count)} features."
+
+        )
+
+
+    if not pd.isna(nearest_distance):
+
+        parts.append(
+
+            "Nearest mapped infrastructure feature "
+            f"is approximately "
+            f"{format_distance(nearest_distance)}."
+
+        )
+
+
+    parts.append(
+
+        "These outputs are screening indicators "
+        "and review context, not calibrated "
+        "probabilities, damage estimates, or "
+        "automatic alerts."
+
+    )
+
+
+    return " ".join(parts)
+
+
+fusion[
+    "explanation"
+] = fusion.apply(
+    generate_explanation,
+    axis=1
+)
+
+
+# ============================================================
+# 31. FINAL OUTPUT COLUMNS
+# ============================================================
+
+final_columns = [
+
+    "earthquake_id",
+
+    "location_name",
+
+    "earthquake_date",
+
+    "latitude",
+
+    "longitude",
+
+    "magnitude",
+
+    "earthquake_depth_km",
+
+    "P1_ground_failure_score",
+
+    "matched_P2_Mw",
+
+    "mean_P2_liquefaction_model_score",
+
+    "max_P2_liquefaction_model_score",
+
+    "p2_site_count",
+
+    "spatial_evidence_scenario",
+
+    "spatial_anchor_count",
+
+    "spatial_historical_records",
+
+    "spatial_mean_ShakeMap_PGA",
+
+    "spatial_mean_historical_L_rate",
+
+    "spatial_evidence_available",
+
+    "infrastructure_count",
+
+    "nearest_infrastructure_distance_km",
+
+    "hospital_count",
+
+    "school_count",
+
+    "bridge_count",
+
+    "road_count",
+
+    "review_context",
+
+    "priority_level",
+
+    "explanation"
+
+]
+
+
+final_columns = [
+
+    column
+
+    for column
+    in final_columns
+
+    if column
+    in fusion.columns
+
+]
 
 
 final = fusion[
@@ -782,48 +1393,78 @@ final = fusion[
 
 
 # ============================================================
-# 24. SAVE FINAL OUTPUT
+# 32. SAVE FINAL OUTPUT
 # ============================================================
 
 final.to_csv(
-    output_file,
+
+    FINAL_OUTPUT_FILE,
+
     index=False
+
+)
+
+
+print()
+print(
+    f"Final output saved: "
+    f"{FINAL_OUTPUT_FILE}"
 )
 
 
 # ============================================================
-# 25. CREATE MAP DATA
+# 33. MAP OUTPUT
 # ============================================================
 
 map_columns = [
+
     "earthquake_id",
+
     "location_name",
-    "earthquake_date",
+
     "latitude",
+
     "longitude",
+
     "magnitude",
 
-    "P1_ground_failure_probability",
+    "P1_ground_failure_score",
 
-    "mean_P2_liquefaction_probability",
+    "mean_P2_liquefaction_model_score",
 
-    "final_risk_score",
+    "max_P2_liquefaction_model_score",
 
-    "risk_level",
+    "spatial_evidence_available",
 
-    "nearby_hospital",
-    "nearby_school",
-    "nearby_bridge",
-    "nearby_road",
+    "spatial_anchor_count",
 
-    "nearest_hospital_km",
-    "nearest_school_km",
-    "nearest_bridge_km",
-    "nearest_road_km",
+    "spatial_historical_records",
+
+    "spatial_mean_ShakeMap_PGA",
+
+    "spatial_mean_historical_L_rate",
 
     "infrastructure_count",
 
-    "priority_level"
+    "nearest_infrastructure_distance_km",
+
+    "review_context",
+
+    "explanation"
+
+]
+
+
+map_columns = [
+
+    column
+
+    for column
+    in map_columns
+
+    if column
+    in final.columns
+
 ]
 
 
@@ -833,152 +1474,277 @@ map_data = final[
 
 
 map_data.to_csv(
-    map_output_file,
+
+    MAP_OUTPUT_FILE,
+
     index=False
+
+)
+
+
+print(
+
+    f"Map output saved: "
+    f"{MAP_OUTPUT_FILE}"
+
 )
 
 
 # ============================================================
-# 26. SAVE EXPLANATIONS
+# 34. EXPLANATION OUTPUT
 # ============================================================
 
-explanation_data = final[
-    [
-        "earthquake_id",
-        "location_name",
-        "risk_level",
-        "priority_level",
-        "explanation"
-    ]
+explanation_columns = [
+
+    "earthquake_id",
+
+    "location_name",
+
+    "review_context",
+
+    "explanation"
+
+]
+
+
+explanation_columns = [
+
+    column
+
+    for column
+    in explanation_columns
+
+    if column
+    in final.columns
+
+]
+
+
+explanations = final[
+    explanation_columns
 ].copy()
 
 
-explanation_data.to_csv(
-    explanation_file,
+explanations.to_csv(
+
+    EXPLANATION_OUTPUT_FILE,
+
     index=False
+
+)
+
+
+print(
+
+    f"Explanation output saved: "
+    f"{EXPLANATION_OUTPUT_FILE}"
+
 )
 
 
 # ============================================================
-# 27. DISPLAY RESULTS
+# 35. SCENARIO SIDE-BY-SIDE DISPLAY
 # ============================================================
 
-print("\n")
-print("=" * 70)
-print("QUAKESHIELD PIPELINE COMPLETED")
-print("=" * 70)
-
-
-print(
-    f"\nEarthquake scenarios: "
-    f"{len(final)}"
-)
-
-
-print("\nRisk distribution:")
-
-print(
-    final[
-        "risk_level"
-    ]
-    .value_counts()
-    .to_string()
-)
-
-
-print("\nPriority distribution:")
-
-print(
-    final[
-        "priority_level"
-    ]
-    .value_counts()
-    .to_string()
-)
-
-
-print("\nInfrastructure coverage:")
-
-print(
-    f"Hospitals: "
-    f"{final['nearby_hospital'].sum()}"
-)
-
-print(
-    f"Schools: "
-    f"{final['nearby_school'].sum()}"
-)
-
-print(
-    f"Bridges: "
-    f"{final['nearby_bridge'].sum()}"
-)
-
-print(
-    f"Roads: "
-    f"{final['nearby_road'].sum()}"
-)
-
-
-# ============================================================
-# 28. TOP SCENARIOS
-# ============================================================
-
-print("\nTop scenarios:")
+print()
+print("============================================================")
+print("SCENARIO INDICATORS")
+print("============================================================")
 
 
 display_columns = [
+
     "location_name",
-    "P1_ground_failure_probability",
-    "mean_P2_liquefaction_probability",
-    "final_risk_score",
-    "risk_level",
-    "nearest_hospital_km",
-    "nearest_school_km",
-    "nearest_bridge_km",
-    "nearest_road_km",
-    "priority_level"
+
+    "P1_ground_failure_score",
+
+    "mean_P2_liquefaction_model_score",
+
+    "spatial_evidence_available",
+
+    "spatial_anchor_count",
+
+    "spatial_historical_records",
+
+    "spatial_mean_ShakeMap_PGA",
+
+    "spatial_mean_historical_L_rate",
+
+    "infrastructure_count",
+
+    "review_context"
+
+]
+
+
+display_columns = [
+
+    column
+
+    for column
+    in display_columns
+
+    if column
+    in final.columns
+
 ]
 
 
 print(
+
     final[
         display_columns
     ]
-    .sort_values(
-        "final_risk_score",
-        ascending=False
+
+    .to_string(
+        index=False
     )
-    .head(5)
-    .to_string(index=False)
+
 )
 
 
 # ============================================================
-# 29. OUTPUT FILES
+# 36. FINAL VALIDATION
 # ============================================================
 
-print("\nSaved:")
+print()
+print("============================================================")
+print("FINAL VALIDATION")
+print("============================================================")
 
-print(output_file)
-print(map_output_file)
-print(explanation_file)
-print(risk_input_file)
-
-
-print("\nPipeline:")
 
 print(
-    "Earthquake"
-    " → P1 Ground Failure"
-    " → P2 Liquefaction"
-    " → Risk Fusion"
-    " → Risk Level"
-    " → Infrastructure Proximity"
-    " → Priority"
-    " → Explanation"
-    " → Map Output"
+    f"Earthquake scenarios: {len(final)}"
 )
 
 
-print("\n" + "=" * 70)
+if len(final) != 9:
+
+    print(
+        "WARNING: Expected 9 scenarios."
+    )
+
+else:
+
+    print(
+        "Scenario count check: PASS"
+    )
+
+
+if "risk_level" in final.columns:
+
+    print(
+        "WARNING: risk_level still exists!"
+    )
+
+else:
+
+    print(
+        "risk_level removal check: PASS"
+    )
+
+
+if "final_risk_score" in final.columns:
+
+    print(
+        "WARNING: final_risk_score still exists!"
+    )
+
+else:
+
+    print(
+        "final_risk_score removal check: PASS"
+    )
+
+
+print()
+print(
+    "Spatial evidence scenarios:"
+)
+
+
+spatial_scenarios = (
+
+    final.loc[
+
+        final[
+            "spatial_evidence_available"
+        ],
+
+        "location_name"
+
+    ]
+
+    .tolist()
+
+)
+
+
+if spatial_scenarios:
+
+    for scenario in spatial_scenarios:
+
+        print(
+            f"  - {scenario}"
+        )
+
+else:
+
+    print(
+        "  None"
+    )
+
+
+# ============================================================
+# 37. PIPELINE SUMMARY
+# ============================================================
+
+print()
+print("============================================================")
+print("QUAKESHIELD PIPELINE COMPLETED")
+print("============================================================")
+
+
+print(
+    "P1: Ground-failure model indicator "
+    "(Slope + PGA)"
+)
+
+
+print(
+    "P2: Liquefaction model indicator"
+)
+
+
+print(
+    "Spatial evidence: Historical cases + "
+    "verified NGL anchors + USGS ShakeMap PGA"
+)
+
+
+print(
+    "Infrastructure: Mapped proximity context"
+)
+
+
+print(
+    "Combined risk score: NOT USED"
+)
+
+
+print(
+    "Risk levels: NOT USED"
+)
+
+
+print(
+    "Automatic alerts: NOT USED"
+)
+
+
+print(
+    "Interpretation: Human review required"
+)
+
+
+print("============================================================")
