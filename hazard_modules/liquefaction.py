@@ -1,6 +1,6 @@
-
+﻿
 # ============================================================
-# QUAKESHIELD â€” P2 LIQUEFACTION HAZARD MODULE
+# QUAKESHIELD Ã¢â‚¬â€ P2 LIQUEFACTION HAZARD MODULE
 # ============================================================
 #
 # Independent implementation of the production P2 model.
@@ -46,7 +46,7 @@ DEFAULT_MODEL_FILE = (
 
 REQUIRED_FEATURES = [
 
-    "Ïƒv/Ïƒv'",
+    "σv/σv'",
     "(N1)60",
     "qt1N",
     "Ic",
@@ -213,93 +213,9 @@ def get_module_info():
 # ============================================================
 
 if __name__ == "__main__":
-
     print()
     print("=" * 60)
-    print("QUAKESHIELD â€” P2 LIQUEFACTION MODULE TEST")
+    print("QUAKESHIELD LIQUEFACTION MODULE")
     print("=" * 60)
 
-    print()
-    print(f"Module ID: {MODULE_ID}")
-    print(f"Module name: {MODULE_NAME}")
 
-    print()
-    print("Required features:")
-
-    for feature in REQUIRED_FEATURES:
-
-        print(f"  - {feature}")
-
-    print()
-    print(
-        f"Feature count: "
-        f"{len(REQUIRED_FEATURES)}"
-    )
-
-    print()
-    print(
-        f"Model file: "
-        f"{DEFAULT_MODEL_FILE}"
-    )
-
-    model = load_model()
-
-    print()
-    print("Model loading: PASS")
-
-    # Small deterministic test dataset.
-    #
-    # Values are illustrative inputs only and are NOT
-    # presented as scientific examples.
-
-    test_data = pd.DataFrame({
-
-        "Ïƒv/Ïƒv'": [0.8, 1.0, 1.2],
-
-        "(N1)60": [10.0, 20.0, 30.0],
-
-        "qt1N": [80.0, 120.0, 160.0],
-
-        "Ic": [2.0, 2.2, 2.5],
-
-        "VS1 (m/s)": [120.0, 180.0, 240.0],
-
-        "FC (%)": [10.0, 20.0, 30.0],
-
-        "Depth (m)": [5.0, 10.0, 15.0],
-
-        "Mw": [6.9, 7.5, 7.6],
-
-        "PGA(g)": [0.20, 0.40, 0.70],
-
-        "(N1)60_missing": [0, 0, 0],
-
-        "qt1N_missing": [0, 0, 0],
-
-        "Ic_missing": [0, 0, 0],
-
-        "VS1 (m/s)_missing": [0, 0, 0],
-
-        "FC (%)_missing": [0, 0, 0]
-
-    })
-
-    scores = predict_scores(
-        test_data,
-        model=model
-    )
-
-    print()
-    print("Prediction test: PASS")
-
-    for index, score in scores.items():
-
-        print(
-            f"  Test row {index + 1}: "
-            f"{score:.6f}"
-        )
-
-    print()
-    print("P2 module test: PASS")
-
-    print("=" * 60)

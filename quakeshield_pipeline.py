@@ -1,6 +1,6 @@
-
+﻿
 # ============================================================
-# QUAKESHIELD â€” HISTORICAL SECONDARY-HAZARD SCREENING PIPELINE
+# QUAKESHIELD Ã¢â‚¬â€ HISTORICAL SECONDARY-HAZARD SCREENING PIPELINE
 # ============================================================
 #
 # CURRENT PROTOTYPE
@@ -456,8 +456,7 @@ print(
 # ============================================================
 
 p2_base_features = [
-
-    "Ïƒv/Ïƒv'",
+    "σv/σv'",
     "(N1)60",
     "qt1N",
     "Ic",
@@ -466,7 +465,6 @@ p2_base_features = [
     "Depth (m)",
     "Mw",
     "PGA(g)"
-
 ]
 
 
@@ -1748,3 +1746,4 @@ print(
 
 
 print("============================================================")
+

@@ -1,0 +1,14 @@
+σv/σv'
+(N1)60
+qt1N
+Ic
+VS1 (m/s)
+FC (%)
+Depth (m)
+Mw
+PGA(g)
+(N1)60_missing
+qt1N_missing
+Ic_missing
+VS1 (m/s)_missing
+FC (%)_missing
